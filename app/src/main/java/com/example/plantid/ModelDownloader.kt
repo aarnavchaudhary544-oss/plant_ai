@@ -15,18 +15,37 @@ class ModelDownloader(private val context: Context) {
 
     suspend fun downloadModel(urlStr: String, fileName: String, onProgress: (Int) -> Unit): File? = withContext(Dispatchers.IO) {
         try {
-            val url = URL(urlStr)
-            val connection = url.openConnection() as HttpURLConnection
-            connection.connect()
+            var url = URL(urlStr)
+            var connection = url.openConnection() as HttpURLConnection
+            var redirect = false
+            
+            // Handle redirects (up to 3 times)
+            for (i in 0..3) {
+                connection.connect()
+                val status = connection.responseCode
+                if (status != HttpURLConnection.HTTP_OK && (status == HttpURLConnection.HTTP_MOVED_TEMP
+                    || status == HttpURLConnection.HTTP_MOVED_PERM
+                    || status == HttpURLConnection.HTTP_SEE_OTHER)) {
+                    val newUrlStr = connection.getHeaderField("Location")
+                    connection.disconnect()
+                    url = URL(newUrlStr)
+                    connection = url.openConnection() as HttpURLConnection
+                    redirect = true
+                } else {
+                    break
+                }
+            }
             
             if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                android.util.Log.e("ModelDownloader", "Failed to download model, HTTP code: ${connection.responseCode}")
                 return@withContext null
             }
             
             val fileLength = connection.contentLength
             val inputStream = connection.inputStream
-            val file = File(context.filesDir, fileName)
-            val outputStream = FileOutputStream(file)
+            
+            val tempFile = File(context.filesDir, "$fileName.tmp")
+            val outputStream = FileOutputStream(tempFile)
 
             val buffer = ByteArray(4096)
             var bytesRead: Int
@@ -48,17 +67,23 @@ class ModelDownloader(private val context: Context) {
             outputStream.close()
             inputStream.close()
             
-            // Reject small files (like 404 HTML pages)
-            if (file.length() < 10 * 1024 * 1024) { // Less than 10MB is not a valid LLM model
-                android.util.Log.e("ModelDownloader", "Downloaded file is too small to be a valid LLM model: ${file.length()} bytes")
-                file.delete()
+            // Reject small files
+            if (tempFile.length() < 10 * 1024 * 1024) { // Less than 10MB is not a valid LLM model
+                android.util.Log.e("ModelDownloader", "Downloaded file is too small to be a valid LLM model: ${tempFile.length()} bytes")
+                tempFile.delete()
                 return@withContext null
             }
+            
+            val finalFile = File(context.filesDir, fileName)
+            if (finalFile.exists()) {
+                finalFile.delete()
+            }
+            tempFile.renameTo(finalFile)
 
             withContext(Dispatchers.Main) {
                 onProgress(100)
             }
-            return@withContext file
+            return@withContext finalFile
         } catch (e: Exception) {
             e.printStackTrace()
             null

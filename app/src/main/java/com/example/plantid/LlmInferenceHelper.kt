@@ -15,7 +15,7 @@ import com.google.mediapipe.tasks.genai.llminference.ProgressListener
 
 class LlmInferenceHelper(
     private val context: Context,
-    private val modelName: String = "gemma-4-E2B-it-web.task"
+    private val modelName: String = "gemma-4-E2B-v2.task"
 ) {
 
     private var llmInference: LlmInference? = null
