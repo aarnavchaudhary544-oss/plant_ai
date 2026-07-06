@@ -17,7 +17,7 @@ import com.google.mediapipe.tasks.genai.llminference.ProgressListener
 
 class LlmInferenceHelper(
     private val context: Context,
-    private val modelName: String = "gemma-4-E2B-v3.task"
+    private val modelName: String = "gemma-4-E2B-v3.litertlm"
 ) {
 
     private var llmInference: LlmInference? = null
@@ -29,8 +29,8 @@ class LlmInferenceHelper(
     fun isModelAvailable(): Boolean {
         val externalDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
         val modelFile = File(externalDir, modelName)
-        // Ensure the file is completely downloaded (2.0 GB)
-        return modelFile.exists() && modelFile.length() >= 2000000000L
+        // Ensure the file is completely downloaded (2.58 GB)
+        return modelFile.exists() && modelFile.length() >= 2580000000L
     }
 
     suspend fun initializeModel() = withContext(Dispatchers.IO) {
