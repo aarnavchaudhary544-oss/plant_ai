@@ -98,7 +98,7 @@ dependencies {
   implementation("org.tensorflow:tensorflow-lite:2.16.1")
   
   // MediaPipe for Gemma
-  implementation("com.google.mediapipe:tasks-genai:0.10.35")
+  implementation("com.google.ai.edge.litertlm:litertlm-android:0.13.1")
   implementation("com.google.mediapipe:tasks-vision:0.10.14")
   
   // Views
