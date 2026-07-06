@@ -2,6 +2,8 @@ package com.example.plantid
 
 import android.content.Context
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.channels.awaitClose
@@ -23,17 +25,17 @@ class LlmInferenceHelper(
     private val TAG = "LlmInferenceHelper"
 
     fun isModelAvailable(): Boolean {
-        val modelFile = File(context.filesDir, modelName)
+        val externalDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+        val modelFile = File(externalDir, modelName)
         // A valid LLM model will be well over 10MB (typically GBs)
         return modelFile.exists() && modelFile.length() > 10 * 1024 * 1024
     }
 
-    fun initializeModel() {
-        if (!isModelAvailable()) {
-            Log.e(TAG, "Model file not found.")
-            return
-        }
-        val modelFile = File(context.filesDir, modelName)
+    suspend fun initializeModel() = withContext(Dispatchers.IO) {
+        if (llmInference != null) return@withContext
+        val externalDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+        val modelFile = File(externalDir, modelName)
+        if (!modelFile.exists()) return@withContext
         try {
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.absolutePath)

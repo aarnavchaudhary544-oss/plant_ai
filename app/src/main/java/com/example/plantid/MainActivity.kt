@@ -8,6 +8,15 @@ import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
+import android.os.Handler
+import android.os.Looper
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
@@ -19,8 +28,11 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.plantid.databinding.ActivityMainBinding
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import java.io.InputStream
+import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -37,7 +49,18 @@ class MainActivity : AppCompatActivity() {
         private const val GEMMA_FILENAME = "gemma-4-E2B-v3.task"
     }
     private var lastCapturedBitmap: Bitmap? = null
-
+    
+    private lateinit var prefs: SharedPreferences
+    private var downloadId: Long = -1L
+    
+    private val downloadReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+            if (id == downloadId && downloadId != -1L) {
+                handleDownloadCompletion()
+            }
+        }
+    }
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
@@ -86,8 +109,21 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         cameraExecutor = Executors.newSingleThreadExecutor()
+        prefs = getSharedPreferences("PlantIDPrefs", Context.MODE_PRIVATE)
+        downloadId = prefs.getLong("download_id", -1L)
 
         initializeApp()
+        
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(downloadReceiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(downloadReceiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+        }
+        
+        // Resume UI polling if download is already in progress
+        if (downloadId != -1L) {
+            startDownloadPolling()
+        }
 
         binding.captureButton.setOnClickListener { takePhoto() }
         binding.galleryButton.setOnClickListener { pickImageLauncher.launch("image/*") }
@@ -124,23 +160,85 @@ class MainActivity : AppCompatActivity() {
 
     private fun downloadGemmaModel(bitmap: Bitmap) {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        binding.downloadOverlay.visibility = View.VISIBLE
-        binding.downloadStatusText.text = "Downloading Gemma AI (~2.5GB)..."
-        binding.downloadProgressBar.progress = 0
+        
+        val externalDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val file = File(externalDir, GEMMA_FILENAME)
+        if (file.exists()) {
+            file.delete()
+        }
 
-        val downloader = ModelDownloader(this)
+        val request = DownloadManager.Request(Uri.parse(GEMMA_URL))
+            .setTitle("Gemma AI Model")
+            .setDescription("Downloading AI model for PlantID (~2.5GB)")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, GEMMA_FILENAME)
+            .setAllowedOverMetered(true)
+            .setAllowedOverRoaming(true)
+
+        val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        downloadId = downloadManager.enqueue(request)
+        prefs.edit().putLong("download_id", downloadId).apply()
+
+        startDownloadPolling()
+    }
+    
+    private fun startDownloadPolling() {
+        binding.downloadOverlay.visibility = View.VISIBLE
+        binding.downloadStatusText.text = "Downloading Gemma AI (~2.5GB) in background..."
+        
         lifecycleScope.launch {
-            val file = downloader.downloadModel(GEMMA_URL, GEMMA_FILENAME) { progress ->
-                binding.downloadProgressBar.progress = progress
+            val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            var isDownloading = true
+            while (isActive && isDownloading && downloadId != -1L) {
+                val query = DownloadManager.Query().setFilterById(downloadId)
+                val cursor = downloadManager.query(query)
+                if (cursor != null && cursor.moveToFirst()) {
+                    val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                    val status = if (statusIndex != -1) cursor.getInt(statusIndex) else DownloadManager.STATUS_FAILED
+                    
+                    val downloadedIndex = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                    val totalIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+                    
+                    if (downloadedIndex != -1 && totalIndex != -1) {
+                        val bytesDownloaded = cursor.getLong(downloadedIndex)
+                        val bytesTotal = cursor.getLong(totalIndex)
+                        val lengthToUse = if (bytesTotal > 0) bytesTotal else 2588147712L
+                        
+                        val progress = ((bytesDownloaded * 100) / lengthToUse).toInt().coerceIn(0, 100)
+                        binding.downloadProgressBar.progress = progress
+                    }
+                    
+                    if (status == DownloadManager.STATUS_SUCCESSFUL || status == DownloadManager.STATUS_FAILED) {
+                        isDownloading = false
+                        if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                            handleDownloadCompletion()
+                        } else {
+                            binding.downloadOverlay.visibility = View.GONE
+                            Toast.makeText(this@MainActivity, "Download failed.", Toast.LENGTH_SHORT).show()
+                            downloadId = -1L
+                            prefs.edit().remove("download_id").apply()
+                        }
+                    }
+                } else {
+                    isDownloading = false
+                }
+                cursor?.close()
+                delay(1000)
             }
-            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            binding.downloadOverlay.visibility = View.GONE
-            if (file != null) {
-                Toast.makeText(this@MainActivity, "Gemma Model Downloaded!", Toast.LENGTH_SHORT).show()
-                startPlantDoctor(bitmap)
-            } else {
-                Toast.makeText(this@MainActivity, "Failed to download model.", Toast.LENGTH_SHORT).show()
-            }
+        }
+    }
+    
+    private fun handleDownloadCompletion() {
+        if (downloadId == -1L) return
+        downloadId = -1L
+        prefs.edit().remove("download_id").apply()
+        
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        binding.downloadOverlay.visibility = View.GONE
+        Toast.makeText(this@MainActivity, "Gemma Model Downloaded!", Toast.LENGTH_SHORT).show()
+        
+        lastCapturedBitmap?.let { bitmap ->
+            startPlantDoctor(bitmap)
         }
     }
 
@@ -246,6 +344,11 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         cameraExecutor.shutdown()
         llmInferenceHelper.close()
+        try {
+            unregisterReceiver(downloadReceiver)
+        } catch (e: Exception) {
+            // Receiver not registered
+        }
     }
 
 }
