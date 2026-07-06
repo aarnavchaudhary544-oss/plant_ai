@@ -14,6 +14,7 @@ import android.graphics.Bitmap
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
 import com.google.mediapipe.tasks.genai.llminference.ProgressListener
+import com.google.mediapipe.tasks.genai.llminference.VisionModelOptions
 
 class LlmInferenceHelper(
     private val context: Context,
@@ -40,10 +41,13 @@ class LlmInferenceHelper(
         if (!modelFile.exists()) return@withContext
 
         try {
+            val visionOptions = VisionModelOptions.builder().build()
+            
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.absolutePath)
                 .setMaxTokens(1024)
                 .setMaxNumImages(1)
+                .setVisionModelOptions(visionOptions)
                 .build()
 
             llmInference = LlmInference.createFromOptions(context, options)
