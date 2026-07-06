@@ -33,8 +33,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var llmInferenceHelper: LlmInferenceHelper
     companion object {
         private const val TAG = "PlantIDApp"
-        private const val GEMMA_URL = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task"
-        private const val GEMMA_FILENAME = "gemma-4-E2B-v2.task"
+        private const val GEMMA_URL = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm"
+        private const val GEMMA_FILENAME = "gemma-4-E2B-v3.task"
     }
     private var lastCapturedBitmap: Bitmap? = null
 
