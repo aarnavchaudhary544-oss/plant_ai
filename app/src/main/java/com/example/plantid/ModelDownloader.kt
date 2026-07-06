@@ -41,23 +41,31 @@ class ModelDownloader(private val context: Context) {
                 return@withContext null
             }
             
-            val fileLength = connection.contentLength
+            val fileLength = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                connection.contentLengthLong
+            } else {
+                connection.contentLength.toLong()
+            }
+            // Fallback for chunked transfer or missing header
+            val lengthToUse = if (fileLength > 0) fileLength else 2588147712L
+            
             val inputStream = connection.inputStream
             
             val tempFile = File(context.filesDir, "$fileName.tmp")
             val outputStream = FileOutputStream(tempFile)
 
-            val buffer = ByteArray(4096)
+            val buffer = ByteArray(8192)
             var bytesRead: Int
             var totalRead: Long = 0
+            var lastProgress = -1
 
             while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                 outputStream.write(buffer, 0, bytesRead)
                 totalRead += bytesRead
                 
-                // Update progress every megabyte to avoid spamming the UI thread
-                if (totalRead % (1024 * 1024) < 4096) {
-                    val progress = if (fileLength > 0) ((totalRead * 100) / fileLength).toInt() else 0
+                val progress = ((totalRead * 100) / lengthToUse).toInt().coerceIn(0, 100)
+                if (progress != lastProgress) {
+                    lastProgress = progress
                     withContext(Dispatchers.Main) {
                         onProgress(progress)
                     }
