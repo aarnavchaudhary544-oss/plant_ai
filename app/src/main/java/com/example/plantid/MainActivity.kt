@@ -159,6 +159,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun downloadGemmaModel(bitmap: Bitmap) {
+        if (downloadId != -1L) {
+            startDownloadPolling()
+            return
+        }
+
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         
         val externalDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)

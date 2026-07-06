@@ -24,11 +24,13 @@ class LlmInferenceHelper(
     private var llmSession: LlmInferenceSession? = null
     private val TAG = "LlmInferenceHelper"
 
+    private var initializationError: String? = null
+
     fun isModelAvailable(): Boolean {
         val externalDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
         val modelFile = File(externalDir, modelName)
-        // A valid LLM model will be well over 10MB (typically GBs)
-        return modelFile.exists() && modelFile.length() > 10 * 1024 * 1024
+        // Ensure the file is completely downloaded (2.58 GB)
+        return modelFile.exists() && modelFile.length() >= 2580000000L
     }
 
     suspend fun initializeModel() = withContext(Dispatchers.IO) {
@@ -36,6 +38,7 @@ class LlmInferenceHelper(
         val externalDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
         val modelFile = File(externalDir, modelName)
         if (!modelFile.exists()) return@withContext
+
         try {
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.absolutePath)
@@ -50,7 +53,8 @@ class LlmInferenceHelper(
             
             Log.d(TAG, "LLM initialized successfully.")
         } catch (e: Exception) {
-            Log.e(TAG, "Error initializing LLM", e)
+            Log.e("PlantIDApp", "Error initializing LLM", e)
+            initializationError = e.message ?: e.toString()
         }
     }
 
@@ -60,7 +64,8 @@ class LlmInferenceHelper(
         }
         
         if (llmInference == null || llmSession == null) {
-            trySend("Model not available or failed to load.")
+            val errorMsg = initializationError ?: "Model not available or failed to load."
+            trySend(errorMsg)
             close()
             return@callbackFlow
         }
