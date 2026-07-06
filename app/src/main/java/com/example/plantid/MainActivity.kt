@@ -45,7 +45,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var llmInferenceHelper: LlmInferenceHelper
     companion object {
         private const val TAG = "PlantIDApp"
-        private const val GEMMA_URL = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm"
+        private const val GEMMA_URL = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task"
         private const val GEMMA_FILENAME = "gemma-4-E2B-v3.task"
     }
     private var lastCapturedBitmap: Bitmap? = null
@@ -174,7 +174,7 @@ class MainActivity : AppCompatActivity() {
 
         val request = DownloadManager.Request(Uri.parse(GEMMA_URL))
             .setTitle("Gemma AI Model")
-            .setDescription("Downloading AI model for PlantID (~2.5GB)")
+            .setDescription("Downloading AI model for PlantID (~2.0GB)")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, GEMMA_FILENAME)
             .setAllowedOverMetered(true)
@@ -189,7 +189,7 @@ class MainActivity : AppCompatActivity() {
     
     private fun startDownloadPolling() {
         binding.downloadOverlay.visibility = View.VISIBLE
-        binding.downloadStatusText.text = "Downloading Gemma AI (~2.5GB) in background..."
+        binding.downloadStatusText.text = "Downloading Gemma AI (~2.0GB) in background..."
         
         lifecycleScope.launch {
             val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
@@ -207,7 +207,7 @@ class MainActivity : AppCompatActivity() {
                     if (downloadedIndex != -1 && totalIndex != -1) {
                         val bytesDownloaded = cursor.getLong(downloadedIndex)
                         val bytesTotal = cursor.getLong(totalIndex)
-                        val lengthToUse = if (bytesTotal > 0) bytesTotal else 2588147712L
+                        val lengthToUse = if (bytesTotal > 0) bytesTotal else 2003697664L
                         
                         val progress = ((bytesDownloaded * 100) / lengthToUse).toInt().coerceIn(0, 100)
                         binding.downloadProgressBar.progress = progress
