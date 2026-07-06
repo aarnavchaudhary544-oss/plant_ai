@@ -49,6 +49,8 @@ class LlmInferenceHelper(
         try {
             val engineConfig = EngineConfig(
                 modelPath = modelFile.absolutePath,
+                backend = Backend.CPU(),
+                visionBackend = Backend.CPU(),
                 maxNumTokens = 1024,
                 maxNumImages = 1
             )
