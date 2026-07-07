@@ -69,7 +69,7 @@ class LlmInferenceHelper(
         }
     }
 
-    fun getPlantAdvice(imageBitmap: Bitmap): Flow<String> = callbackFlow {
+    fun getPlantAdvice(imageBitmap: Bitmap, customQuestion: String? = null): Flow<String> = callbackFlow {
         if (engine == null || conversation == null) {
             initializeModel()
         }
@@ -81,7 +81,7 @@ class LlmInferenceHelper(
             return@callbackFlow
         }
 
-        val prompt = "Analyze this image and identify the plant. Then, provide a short, highly accurate, and concise summary of optimal growing conditions, watering needs, and common diseases."
+        val prompt = customQuestion ?: "Analyze this image and identify the plant. Then, provide a short, highly accurate, and concise summary of optimal growing conditions, watering needs, and common diseases."
         
         try {
             // Resize if too large

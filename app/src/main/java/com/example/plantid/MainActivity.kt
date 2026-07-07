@@ -36,13 +36,17 @@ import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-class MainActivity : AppCompatActivity() {
+import android.widget.EditText
+import android.app.AlertDialog
+
+class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListener {
 
     private lateinit var binding: ActivityMainBinding
     private var imageCapture: ImageCapture? = null
     private lateinit var cameraExecutor: ExecutorService
 
     private lateinit var llmInferenceHelper: LlmInferenceHelper
+    private lateinit var imageClassifierHelper: ImageClassifierHelper
     companion object {
         private const val TAG = "PlantIDApp"
         private const val GEMMA_URL = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm"
@@ -134,13 +138,39 @@ class MainActivity : AppCompatActivity() {
             binding.resultTextView.text = "Point camera at a plant..."
             binding.confidenceTextView.text = ""
             binding.doctorButton.visibility = View.GONE
+            binding.askQuestionButton.visibility = View.GONE
             binding.doctorAdviceTextView.text = ""
             lastCapturedBitmap = null
         }
     }
     
+    override fun onError(error: String) {
+        runOnUiThread {
+            Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun onResults(results: List<ImageClassifierHelper.CustomClassification>?) {
+        runOnUiThread {
+            if (results != null && results.isNotEmpty()) {
+                val topResult = results[0]
+                if (topResult.score > 0.6f) {
+                    binding.resultTextView.text = topResult.label
+                    binding.confidenceTextView.text = String.format("Confidence: %.1f%%", topResult.score * 100.0f)
+                } else {
+                    binding.resultTextView.text = "Unidentified"
+                    binding.confidenceTextView.text = String.format("Best guess: %s (%.1f%%)", topResult.label, topResult.score * 100.0f)
+                }
+            } else {
+                binding.resultTextView.text = "Unidentified"
+                binding.confidenceTextView.text = ""
+            }
+        }
+    }
+    
     private fun initializeApp() {
         llmInferenceHelper = LlmInferenceHelper(this, GEMMA_FILENAME)
+        imageClassifierHelper = ImageClassifierHelper(this, this)
         
         if (allPermissionsGranted()) {
             startCamera()
@@ -151,11 +181,37 @@ class MainActivity : AppCompatActivity() {
         binding.doctorButton.setOnClickListener {
             val bitmap = lastCapturedBitmap ?: return@setOnClickListener
             if (llmInferenceHelper.isModelAvailable()) {
-                startPlantDoctor(bitmap)
+                startPlantDoctor(bitmap, null)
             } else {
                 downloadGemmaModel(bitmap)
             }
         }
+
+        binding.askQuestionButton.setOnClickListener {
+            val bitmap = lastCapturedBitmap ?: return@setOnClickListener
+            if (llmInferenceHelper.isModelAvailable()) {
+                showQuestionPopup(bitmap)
+            } else {
+                downloadGemmaModel(bitmap)
+            }
+        }
+    }
+
+    private fun showQuestionPopup(bitmap: Bitmap) {
+        val editText = EditText(this)
+        editText.hint = "Ask a question about this plant..."
+        
+        AlertDialog.Builder(this)
+            .setTitle("Ask a Question")
+            .setView(editText)
+            .setPositiveButton("Ask") { _, _ ->
+                val question = editText.text.toString()
+                if (question.isNotBlank()) {
+                    startPlantDoctor(bitmap, question)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun downloadGemmaModel(bitmap: Bitmap) {
@@ -243,16 +299,22 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this@MainActivity, "Gemma Model Downloaded!", Toast.LENGTH_SHORT).show()
         
         lastCapturedBitmap?.let { bitmap ->
-            startPlantDoctor(bitmap)
+            startPlantDoctor(bitmap, null)
         }
     }
 
-    private fun startPlantDoctor(bitmap: Bitmap) {
+    private fun startPlantDoctor(bitmap: Bitmap, customQuestion: String?) {
         binding.doctorButton.isEnabled = false
-        binding.doctorAdviceTextView.text = "Consulting Plant Doctor (Gemma Vision)...\n\n"
+        binding.askQuestionButton.isEnabled = false
+        
+        if (customQuestion == null) {
+            binding.doctorAdviceTextView.text = "Consulting Plant Doctor (Gemma Vision)...\n\n"
+        } else {
+            binding.doctorAdviceTextView.text = "Asking: \"$customQuestion\"\n\n"
+        }
         
         lifecycleScope.launch {
-            llmInferenceHelper.getPlantAdvice(bitmap).collect { chunk ->
+            llmInferenceHelper.getPlantAdvice(bitmap, customQuestion).collect { chunk ->
                 binding.doctorAdviceTextView.append(chunk)
                 
                 // Scroll to bottom
@@ -262,6 +324,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             binding.doctorButton.isEnabled = true
+            binding.askQuestionButton.isEnabled = true
         }
     }
 
@@ -335,9 +398,13 @@ class MainActivity : AppCompatActivity() {
             binding.galleryImageView.visibility = View.VISIBLE
             binding.galleryImageView.setImageBitmap(bitmap)
             binding.clearButton.isEnabled = true
-            binding.resultTextView.text = "Ready to Identify!"
+            binding.resultTextView.text = "Identifying..."
             binding.doctorButton.visibility = View.VISIBLE
+            binding.askQuestionButton.visibility = View.VISIBLE
             lastCapturedBitmap = bitmap
+            
+            // Run image classification
+            imageClassifierHelper.classify(bitmap)
         }
     }
 
