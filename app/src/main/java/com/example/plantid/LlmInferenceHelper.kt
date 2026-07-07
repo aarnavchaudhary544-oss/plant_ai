@@ -51,7 +51,7 @@ class LlmInferenceHelper(
                 modelPath = modelFile.absolutePath,
                 backend = Backend.CPU(),
                 visionBackend = Backend.CPU(),
-                maxNumTokens = 1024,
+                maxNumTokens = 4096,
                 maxNumImages = 1
             )
             
@@ -84,14 +84,23 @@ class LlmInferenceHelper(
         val prompt = "Analyze this image and identify the plant. Then, provide a short, highly accurate, and concise summary of optimal growing conditions, watering needs, and common diseases."
         
         try {
-            // Convert Bitmap to ByteArray
+            // Resize if too large
+            val maxDim = 896
+            var scaledBitmap = imageBitmap
+            if (imageBitmap.width > maxDim || imageBitmap.height > maxDim) {
+                val ratio = Math.min(maxDim.toFloat() / imageBitmap.width, maxDim.toFloat() / imageBitmap.height)
+                val width = (ratio * imageBitmap.width).toInt()
+                val height = (ratio * imageBitmap.height).toInt()
+                scaledBitmap = Bitmap.createScaledBitmap(imageBitmap, width, height, true)
+            }
+
             val stream = ByteArrayOutputStream()
-            imageBitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream)
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
             val byteArray = stream.toByteArray()
             
             val contentList = listOf(
-                Content.Text(prompt),
-                Content.ImageBytes(byteArray)
+                Content.ImageBytes(byteArray),
+                Content.Text(prompt)
             )
             
             val contents = Contents.of(contentList)
