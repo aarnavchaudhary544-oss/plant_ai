@@ -139,6 +139,21 @@ class MainActivity : AppCompatActivity() {
             binding.doctorButton.visibility = View.GONE
             binding.askQuestionButton.visibility = View.GONE
             binding.doctorAdviceTextView.text = ""
+            binding.chatContainer.visibility = View.GONE
+            lastCapturedBitmap = null
+        }
+        
+        binding.closeChatButton.setOnClickListener {
+            binding.chatContainer.visibility = View.GONE
+            binding.galleryImageView.visibility = View.GONE
+            binding.viewFinder.visibility = View.VISIBLE
+            binding.bottomCard.visibility = View.VISIBLE
+            binding.clearButton.isEnabled = false
+            binding.resultTextView.text = "Point camera at a plant..."
+            binding.confidenceTextView.text = ""
+            binding.doctorButton.visibility = View.GONE
+            binding.askQuestionButton.visibility = View.GONE
+            binding.chatResponseTextView.text = ""
             lastCapturedBitmap = null
         }
     }
@@ -281,18 +296,27 @@ class MainActivity : AppCompatActivity() {
         binding.doctorButton.isEnabled = false
         binding.askQuestionButton.isEnabled = false
         
+        // Transition to Chat UI
+        binding.galleryImageView.visibility = View.GONE
+        binding.bottomCard.visibility = View.GONE
+        binding.chatContainer.visibility = View.VISIBLE
+        
+        binding.chatImageView.setImageBitmap(bitmap)
+        val currentName = binding.resultTextView.text.toString().trim()
+        binding.chatPlantNameTextView.text = if (currentName == "Ready to Identify!" || currentName == "Identifying with Gemma...") "Unknown Plant" else currentName
+        
         if (customQuestion == null) {
-            binding.doctorAdviceTextView.text = "Consulting Plant Doctor (Gemma Vision)...\n\n"
+            binding.chatResponseTextView.text = "Consulting Plant Doctor (Gemma Vision)...\n\n"
         } else {
-            binding.doctorAdviceTextView.text = "Asking: \"$customQuestion\"\n\n"
+            binding.chatResponseTextView.text = "Asking: \"$customQuestion\"\n\n"
         }
         
         lifecycleScope.launch {
             llmInferenceHelper.getPlantAdvice(bitmap, customQuestion).collect { chunk ->
-                binding.doctorAdviceTextView.append(chunk)
+                binding.chatResponseTextView.append(chunk)
                 
                 // Scroll to bottom
-                val scrollView = binding.doctorAdviceTextView.parent as? android.widget.ScrollView
+                val scrollView = binding.chatResponseTextView.parent as? android.widget.ScrollView
                 scrollView?.post {
                     scrollView.fullScroll(View.FOCUS_DOWN)
                 }
