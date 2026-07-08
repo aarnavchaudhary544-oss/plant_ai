@@ -1,0 +1,28 @@
+name: Auto Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: releases/plant_ai.apk
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
