@@ -9,13 +9,10 @@ import android.media.ExifInterface
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
-import android.os.Handler
-import android.os.Looper
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.SharedPreferences
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
@@ -28,7 +25,6 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.plantid.databinding.ActivityMainBinding
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
 import java.io.InputStream
@@ -48,7 +44,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var llmInferenceHelper: LlmInferenceHelper
     companion object {
         private const val TAG = "PlantIDApp"
-        private const val GEMMA_URL = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm"
         private const val GEMMA_FILENAME = "gemma-4-E2B-v3.litertlm"
     }
     private var lastCapturedBitmap: Bitmap? = null
