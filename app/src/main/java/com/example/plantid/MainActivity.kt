@@ -11,7 +11,6 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -21,6 +20,7 @@ import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
+import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
@@ -53,14 +53,27 @@ class MainActivity : AppCompatActivity() {
     }
     private var lastCapturedBitmap: Bitmap? = null
     
-    private lateinit var prefs: SharedPreferences
-    private var downloadId: Long = -1L
+    private var isDownloading = false
     
     private val downloadReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
-            if (id == downloadId && downloadId != -1L) {
-                handleDownloadCompletion()
+            when (intent?.action) {
+                DownloadService.ACTION_PROGRESS -> {
+                    val progress = intent.getIntExtra(DownloadService.EXTRA_PROGRESS, 0)
+                    binding.downloadProgressBar.progress = progress
+                    if (binding.downloadOverlay.visibility == View.GONE) {
+                        binding.downloadOverlay.visibility = View.VISIBLE
+                        binding.downloadStatusText.text = "Downloading Gemma AI (~2.58GB) in background..."
+                    }
+                }
+                DownloadService.ACTION_COMPLETED -> {
+                    handleDownloadCompletion()
+                }
+                DownloadService.ACTION_FAILED -> {
+                    isDownloading = false
+                    binding.downloadOverlay.visibility = View.GONE
+                    Toast.makeText(this@MainActivity, "Download failed.", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -112,20 +125,16 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         cameraExecutor = Executors.newSingleThreadExecutor()
-        prefs = getSharedPreferences("PlantIDPrefs", Context.MODE_PRIVATE)
-        downloadId = prefs.getLong("download_id", -1L)
-
-        initializeApp()
-        
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(downloadReceiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_EXPORTED)
-        } else {
-            registerReceiver(downloadReceiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+        val filter = IntentFilter().apply {
+            addAction(DownloadService.ACTION_PROGRESS)
+            addAction(DownloadService.ACTION_COMPLETED)
+            addAction(DownloadService.ACTION_FAILED)
         }
         
-        // Resume UI polling if download is already in progress
-        if (downloadId != -1L) {
-            startDownloadPolling()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(downloadReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(downloadReceiver, filter)
         }
 
         binding.captureButton.setOnClickListener { takePhoto() }
@@ -204,85 +213,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun downloadGemmaModel(bitmap: Bitmap, isInstantId: Boolean = false) {
-        if (downloadId != -1L) {
-            startDownloadPolling()
-            return
+        if (isDownloading) return
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
+            }
         }
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        isDownloading = true
         
-        val externalDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        val file = File(externalDir, GEMMA_FILENAME)
-        if (file.exists()) {
-            file.delete()
-        }
-
-        val request = DownloadManager.Request(Uri.parse(GEMMA_URL))
-            .setTitle("Gemma AI Model")
-            .setDescription("Downloading AI model for PlantID (~2.58GB)")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, GEMMA_FILENAME)
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(true)
-
-        val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        downloadId = downloadManager.enqueue(request)
-        prefs.edit().putLong("download_id", downloadId).apply()
-
-        startDownloadPolling()
-    }
-    
-    private fun startDownloadPolling() {
         binding.downloadOverlay.visibility = View.VISIBLE
         binding.downloadStatusText.text = "Downloading Gemma AI (~2.58GB) in background..."
-        
-        lifecycleScope.launch {
-            val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            var isDownloading = true
-            while (isActive && isDownloading && downloadId != -1L) {
-                val query = DownloadManager.Query().setFilterById(downloadId)
-                val cursor = downloadManager.query(query)
-                if (cursor != null && cursor.moveToFirst()) {
-                    val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
-                    val status = if (statusIndex != -1) cursor.getInt(statusIndex) else DownloadManager.STATUS_FAILED
-                    
-                    val downloadedIndex = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
-                    val totalIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-                    
-                    if (downloadedIndex != -1 && totalIndex != -1) {
-                        val bytesDownloaded = cursor.getLong(downloadedIndex)
-                        val bytesTotal = cursor.getLong(totalIndex)
-                        val lengthToUse = if (bytesTotal > 0) bytesTotal else 2588147712L
-                        
-                        val progress = ((bytesDownloaded * 100) / lengthToUse).toInt().coerceIn(0, 100)
-                        binding.downloadProgressBar.progress = progress
-                    }
-                    
-                    if (status == DownloadManager.STATUS_SUCCESSFUL || status == DownloadManager.STATUS_FAILED) {
-                        isDownloading = false
-                        if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                            handleDownloadCompletion()
-                        } else {
-                            binding.downloadOverlay.visibility = View.GONE
-                            Toast.makeText(this@MainActivity, "Download failed.", Toast.LENGTH_SHORT).show()
-                            downloadId = -1L
-                            prefs.edit().remove("download_id").apply()
-                        }
-                    }
-                } else {
-                    isDownloading = false
-                }
-                cursor?.close()
-                delay(1000)
-            }
+        binding.downloadProgressBar.progress = 0
+
+        val serviceIntent = Intent(this, DownloadService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
         }
     }
     
     private fun handleDownloadCompletion() {
-        if (downloadId == -1L) return
-        downloadId = -1L
-        prefs.edit().remove("download_id").apply()
-        
+        isDownloading = false
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding.downloadOverlay.visibility = View.GONE
         Toast.makeText(this@MainActivity, "Gemma Model Downloaded!", Toast.LENGTH_SHORT).show()
