@@ -165,6 +165,8 @@ class MainActivity : AppCompatActivity() {
             binding.chatResponseTextView.text = ""
             lastCapturedBitmap = null
         }
+        
+        initializeApp()
     }
     
     private fun initializeApp() {
