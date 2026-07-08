@@ -229,10 +229,17 @@ class MainActivity : AppCompatActivity() {
         binding.downloadProgressBar.progress = 0
 
         val serviceIntent = Intent(this, DownloadService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start download service", e)
+            Toast.makeText(this, "Failed to start background download.", Toast.LENGTH_SHORT).show()
+            isDownloading = false
+            binding.downloadOverlay.visibility = View.GONE
         }
     }
     
