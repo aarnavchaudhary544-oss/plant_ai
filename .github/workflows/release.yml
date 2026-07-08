@@ -2,8 +2,9 @@ name: Auto Release APK
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -22,7 +23,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: releases/plant_ai.apk
-          name: Release ${{ github.ref_name }}
+          name: Latest Release
+          tag_name: latest
           draft: false
           prerelease: false
           generate_release_notes: true
