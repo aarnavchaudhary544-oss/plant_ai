@@ -135,7 +135,7 @@ class MainActivity : AppCompatActivity() {
         binding.captureButton.setOnClickListener { takePhoto() }
         binding.galleryButton.setOnClickListener { pickImageLauncher.launch("image/*") }
         binding.clearButton.setOnClickListener {
-            binding.galleryImageView.visibility = View.GONE
+            binding.mainImageView.visibility = View.GONE
             binding.viewFinder.visibility = View.VISIBLE
             binding.clearButton.isEnabled = false
             binding.resultTextView.text = "Point camera at a plant..."
@@ -143,22 +143,15 @@ class MainActivity : AppCompatActivity() {
             binding.doctorButton.visibility = View.GONE
             binding.askQuestionButton.visibility = View.GONE
             binding.doctorAdviceTextView.text = ""
-            binding.chatContainer.visibility = View.GONE
+            binding.root.transitionToState(R.id.start)
             lastCapturedBitmap = null
         }
         
         binding.closeChatButton.setOnClickListener {
-            binding.chatContainer.visibility = View.GONE
-            binding.galleryImageView.visibility = View.GONE
-            binding.viewFinder.visibility = View.VISIBLE
-            binding.bottomCard.visibility = View.VISIBLE
-            binding.clearButton.isEnabled = false
-            binding.resultTextView.text = "Point camera at a plant..."
-            binding.confidenceTextView.text = ""
-            binding.doctorButton.visibility = View.GONE
-            binding.askQuestionButton.visibility = View.GONE
+            binding.root.transitionToState(R.id.start)
+            binding.doctorButton.isEnabled = true
+            binding.askQuestionButton.isEnabled = true
             binding.chatResponseTextView.text = ""
-            lastCapturedBitmap = null
         }
         
         initializeApp()
@@ -255,12 +248,9 @@ class MainActivity : AppCompatActivity() {
         binding.doctorButton.isEnabled = false
         binding.askQuestionButton.isEnabled = false
         
-        // Transition to Chat UI
-        binding.galleryImageView.visibility = View.GONE
-        binding.bottomCard.visibility = View.GONE
-        binding.chatContainer.visibility = View.VISIBLE
+        // Transition to Chat UI smoothly
+        binding.root.transitionToState(R.id.chat)
         
-        binding.chatImageView.setImageBitmap(bitmap)
         val currentName = binding.resultTextView.text.toString().trim()
         binding.chatPlantNameTextView.text = if (currentName == "Ready to Identify!" || currentName == "Identifying with Gemma...") "Unknown Plant" else currentName
         
@@ -352,8 +342,8 @@ class MainActivity : AppCompatActivity() {
     private fun showImage(bitmap: Bitmap) {
         runOnUiThread {
             binding.viewFinder.visibility = View.GONE
-            binding.galleryImageView.visibility = View.VISIBLE
-            binding.galleryImageView.setImageBitmap(bitmap)
+            binding.mainImageView.visibility = View.VISIBLE
+            binding.mainImageView.setImageBitmap(bitmap)
             binding.clearButton.isEnabled = true
             binding.resultTextView.text = "Ready to Identify!"
             binding.confidenceTextView.text = ""

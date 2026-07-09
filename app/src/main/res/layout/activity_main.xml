@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.motion.widget.MotionLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    app:layoutDescription="@xml/activity_main_scene"
     tools:context=".MainActivity">
 
     <androidx.camera.view.PreviewView
@@ -13,13 +14,15 @@
         app:layout_constraintBottom_toTopOf="@+id/bottomCard"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <ImageView
-        android:id="@+id/galleryImageView"
+    <!-- Unified Image View for Gallery and Chat states -->
+    <androidx.constraintlayout.utils.widget.ImageFilterView
+        android:id="@+id/mainImageView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:scaleType="fitCenter"
+        android:scaleType="centerCrop"
         android:background="#000000"
         android:visibility="gone"
+        app:roundPercent="0"
         app:layout_constraintBottom_toTopOf="@+id/bottomCard"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -34,6 +37,58 @@
         app:layout_constraintBottom_toTopOf="@+id/bottomCard"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Chat UI Elements (Hidden initially) -->
+    <ImageButton
+        android:id="@+id/closeChatButton"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="48dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Close"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        android:alpha="0"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/chatPlantNameTextView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="48dp"
+        android:layout_marginEnd="16dp"
+        android:text="Plant Name"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:alpha="0"
+        android:visibility="gone"
+        app:layout_constraintEnd_toStartOf="@+id/mainImageView"
+        app:layout_constraintStart_toEndOf="@+id/closeChatButton"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ScrollView
+        android:id="@+id/chatResponseScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="16dp"
+        android:padding="16dp"
+        android:alpha="0"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/mainImageView">
+
+        <TextView
+            android:id="@+id/chatResponseTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="16sp" />
+    </ScrollView>
 
     <!-- Download Overlay -->
     <LinearLayout
@@ -158,71 +213,4 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/chatContainer"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="?android:attr/colorBackground"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <ImageButton
-            android:id="@+id/closeChatButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Close"
-            android:src="@android:drawable/ic_menu_close_clear_cancel"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <TextView
-            android:id="@+id/chatPlantNameTextView"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="48dp"
-            android:layout_marginEnd="16dp"
-            android:text="Plant Name"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            app:layout_constraintEnd_toStartOf="@+id/chatImageView"
-            app:layout_constraintStart_toEndOf="@+id/closeChatButton"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <com.google.android.material.imageview.ShapeableImageView
-            android:id="@+id/chatImageView"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:layout_marginTop="48dp"
-            android:layout_marginEnd="16dp"
-            android:scaleType="centerCrop"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:shapeAppearanceOverlay="@style/CircleImageView" />
-
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_marginTop="16dp"
-            android:padding="16dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/chatImageView">
-
-            <TextView
-                android:id="@+id/chatResponseTextView"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text=""
-                android:textSize="16sp" />
-        </ScrollView>
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-</androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.constraintlayout.motion.widget.MotionLayout>
